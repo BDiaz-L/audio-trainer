@@ -1,4 +1,5 @@
 import { useRef, useState, useMemo, useEffect } from "react";
+import "./index.css";
 
 const TRACKS = [
   { id: 1, title: "1", src: "/Audio/1_Asereje.m4a" },
@@ -23,14 +24,68 @@ export default function AudioTrainer() {
   const audioRef = useRef(null);
   const [currentId, setCurrentId] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [normalizeOn, setNormalizeOn] = useState(true); // <- toggle
 
-  // contador de clics (por pista y tiempo)
+  // Web Audio
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+  const compRef = useRef(null);
+  const gainRef = useRef(null);
+
+  // clicks
   const clickState = useRef({ lastId: null, count: 0, lastTime: 0 });
-  const CLICK_WINDOW_MS = 600; // tiempo entre clics (en ms)
+  const CLICK_WINDOW_MS = 600;
+
+  const ensureAudioGraph = () => {
+    if (audioCtxRef.current) return;
+    const a = audioRef.current;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const src = ctx.createMediaElementSource(a);
+
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.knee.value = 30;
+    comp.ratio.value = 6;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 1.0;
+
+    audioCtxRef.current = ctx;
+    sourceRef.current = src;
+    compRef.current = comp;
+    gainRef.current = gain;
+
+    // conexión inicial según el toggle
+    updateRouting(normalizeOn);
+  };
+
+  // (re)conecta los nodos según esté activada la normalización
+  const updateRouting = (useCompressor) => {
+    if (!sourceRef.current || !gainRef.current || !audioCtxRef.current) return;
+
+    // desconectar cualquier conexión previa
+    try { sourceRef.current.disconnect(); } catch {}
+    try { compRef.current?.disconnect(); } catch {}
+    try { gainRef.current.disconnect(); } catch {}
+
+    if (useCompressor && compRef.current) {
+      sourceRef.current.connect(compRef.current);
+      compRef.current.connect(gainRef.current);
+      gainRef.current.connect(audioCtxRef.current.destination);
+    } else {
+      // bypass del compresor
+      sourceRef.current.connect(gainRef.current);
+      gainRef.current.connect(audioCtxRef.current.destination);
+    }
+  };
 
   const playTrack = (track) => {
     const a = audioRef.current;
     if (!a) return;
+    ensureAudioGraph();
     a.src = track.src;
     a.currentTime = 0;
     a.play().then(() => {
@@ -49,6 +104,7 @@ export default function AudioTrainer() {
   const restartTrack = () => {
     const a = audioRef.current;
     if (!a) return;
+    ensureAudioGraph();
     a.currentTime = 0;
     a.play().then(() => setIsPlaying(true));
   };
@@ -68,42 +124,30 @@ export default function AudioTrainer() {
 
     const count = clickState.current.count;
 
-    // triple clic → reiniciar
-    if (count >= 3) {
+    if (count >= 3) { // triple: reinicia
       restartTrack();
       clickState.current.count = 0;
       return;
     }
-
-    // doble clic → pausa
-    if (count === 2) {
+    if (count === 2) { // doble: pausa
       pauseTrack();
       return;
     }
-
-    // clic simple → reproducir (o reanudar)
+    // simple: reproduce (o reanuda)
     if (currentId !== track.id) {
       playTrack(track);
     } else if (!isPlaying) {
+      ensureAudioGraph();
       audioRef.current.play().then(() => setIsPlaying(true));
     }
   };
 
   return (
-    <div style={{ maxWidth: 980, margin: "24px auto", padding: 16, color: "#eee", fontFamily: "system-ui, Arial" }}>
-      <h2 style={{ marginBottom: 8 }}>Audio Trainer</h2>
-      <p style={{ color: "#9aa", marginTop: 0, marginBottom: 16 }}>
-        🖱️ 1 clic: reproducir · 2 clics: pausa · 3 clics: reiniciar
-      </p>
+    <div className="page">
+      <h2>Audio Trainer</h2>
+      <p className="subtitle">1 clic: reproducir · 2 clics: pausa · 3 clics: reiniciar</p>
 
-      {/* GRID 3 filas × 5 columnas */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: 12,
-        }}
-      >
+      <div className="grid">
         {TRACKS.map((t) => {
           const active = currentId === t.id && isPlaying;
           return (
@@ -111,21 +155,7 @@ export default function AudioTrainer() {
               key={t.id}
               onClick={() => handleButtonClick(t)}
               title={t.title}
-              style={{
-                aspectRatio: "1 / 1",
-                width: "100%",
-                borderRadius: 16,
-                border: active ? "2px solid #8ef" : "1px solid #2a2a2e",
-                background: active ? "#1b2730" : "#1a1a1c",
-                color: "#eee",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 8,
-                fontWeight: 600,
-                transition: "transform .05s ease, background .2s",
-              }}
+              className={`tile ${active ? "active" : ""}`}
               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
@@ -138,22 +168,36 @@ export default function AudioTrainer() {
         })}
       </div>
 
-      {/* Controles inferiores */}
-      <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="footer">
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={normalizeOn}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setNormalizeOn(on);
+              ensureAudioGraph();
+              updateRouting(on);
+            }}
+          />
+          Normalizar
+        </label>
+
         <strong>Volumen</strong>
         <input
           type="range"
           min="0"
-          max="1"
+          max="2"
           step="0.01"
           defaultValue="1"
+          className="stretch"
           onChange={(e) => {
-            const a = audioRef.current;
-            if (a) a.volume = Number(e.target.value);
+            ensureAudioGraph();
+            if (gainRef.current) gainRef.current.gain.value = Number(e.target.value);
           }}
-          style={{ flex: 1 }}
         />
-        <span style={{ color: "#9aa" }}>{isPlaying ? "Reproduciendo" : "Detenido"}</span>
+
+        <span className="subtitle">{isPlaying ? "Reproduciendo" : "Detenido"}</span>
       </div>
 
       <audio
