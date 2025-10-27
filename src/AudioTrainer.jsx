@@ -1,22 +1,24 @@
 import { useRef, useState, useMemo, useEffect } from "react";
 import "./index.css";
+const BASE = import.meta.env.BASE_URL;
+const a = (file) => `${BASE}Audio/${file}`;
 
 const TRACKS = [
-  { id: 1, title: "1", src: "/Audio/1_Asereje.m4a" },
-  { id: 2, title: "2", src: "/Audio/2_Rebelde.m4a" },
-  { id: 3, title: "3", src: "/Audio/3_Despacito.m4a" },
-  { id: 4, title: "4", src: "/Audio/4_Torero.m4a" },
-  { id: 5, title: "5", src: "/Audio/5_La_Bikina.m4a" },
-  { id: 6, title: "6", src: "/Audio/6_Adios_Amor.m4a" },
-  { id: 7, title: "7", src: "/Audio/7_SiNoMeVes.m4a" },
-  { id: 8, title: "8", src: "/Audio/8_Shabadaba.m4a" },
-  { id: 9, title: "9", src: "/Audio/9_Mienteme.m4a" },
-  { id: 10, title: "10", src: "/Audio/10_Yo_Quiero_Chupar.m4a" },
-  { id: 11, title: "11", src: "/Audio/11_Shrakira.m4a" },
-  { id: 12, title: "12", src: "/Audio/12_Angel.m4a" },
-  { id: 13, title: "13", src: "/Audio/13_Boda.m4a" },
-  { id: 14, title: "14", src: "/Audio/14_Muriendo_Lento.m4a" },
-  { id: 15, title: "15", src: "/Audio/15_Halloween.m4a" },
+  { id: 1,  title: "01", src: a("1_Asereje.m4a") },
+  { id: 2,  title: "02", src: a("2_Rebelde.m4a") },
+  { id: 3,  title: "03", src: a("3_Despacito.m4a") },
+  { id: 4,  title: "04", src: a("4_Torero.m4a") },
+  { id: 5,  title: "05", src: a("5_La_Bikina.m4a") },
+  { id: 6,  title: "06", src: a("6_Adios_Amor.m4a") },
+  { id: 7,  title: "07", src: a("7_SiNoMeVes.m4a") },
+  { id: 8,  title: "08", src: a("8_Shabadaba.m4a") },
+  { id: 9,  title: "09", src: a("9_Mienteme.m4a") },
+  { id: 10, title: "10", src: a("10_Yo_Quiero_Chupar.m4a") },
+  { id: 11, title: "11", src: a("11_Shrakira.m4a") },
+  { id: 12, title: "12", src: a("12_Angel.m4a") },
+  { id: 13, title: "13", src: a("13_Boda.m4a") },
+  { id: 14, title: "14", src: a("14_Muriendo_Lento.m4a") },
+  { id: 15, title: "15", src: a("15_Halloween.m4a") },
 ];
 
 
