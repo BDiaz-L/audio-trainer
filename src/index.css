@@ -93,10 +93,10 @@ button:focus-visible {
 }
 
 .tile {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1 / 1;           /* cuadrados */
   width: 100%;
   border-radius: 16px;
-  border: 1px solid #2a2a2e;
+  border: 1px solid #2a2a2e;     /* MISMO grosor activo/inactivo → sin saltos */
   background: #1a1a1c;
   color: #eee;
   cursor: pointer;
@@ -105,11 +105,14 @@ button:focus-visible {
   justify-content: center;
   padding: 8px;
   font-weight: 600;
-  transition: transform .05s ease, background .2s, border-color .2s;
+  user-select: none;             /* no selecciona texto al tocar */
+  -webkit-tap-highlight-color: transparent; /* móvil: sin flash azul */
+  transition: background .2s, box-shadow .2s; /* sin transform */
 }
 
 .tile.active {
-  border: 2px solid #8ef;
+  /* sin cambiar tamaño: resaltamos con sombra/outline */
+  box-shadow: 0 0 0 2px #8ef inset, 0 0 0 0.5px #8ef;
   background: #1b2730;
 }
 

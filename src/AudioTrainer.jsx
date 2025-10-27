@@ -26,7 +26,7 @@ export default function AudioTrainer() {
   const audioRef = useRef(null);
   const [currentId, setCurrentId] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [normalizeOn, setNormalizeOn] = useState(true); // <- toggle
+  const [normalizeOn, setNormalizeOn] = useState(true);
 
   // Web Audio
   const audioCtxRef = useRef(null);
@@ -34,9 +34,9 @@ export default function AudioTrainer() {
   const compRef = useRef(null);
   const gainRef = useRef(null);
 
-  // clicks
-  const clickState = useRef({ lastId: null, count: 0, lastTime: 0 });
-  const CLICK_WINDOW_MS = 600;
+  // para distinguir click vs doble clic
+  const clickTimerRef = useRef(null);
+  const CLICK_DELAY = 220; // ms para decidir entre 1x y 2x clic
 
   const ensureAudioGraph = () => {
     if (audioCtxRef.current) return;
@@ -60,31 +60,26 @@ export default function AudioTrainer() {
     compRef.current = comp;
     gainRef.current = gain;
 
-    // conexión inicial según el toggle
     updateRouting(normalizeOn);
   };
 
-  // (re)conecta los nodos según esté activada la normalización
-  const updateRouting = (useCompressor) => {
+  const updateRouting = (useComp) => {
     if (!sourceRef.current || !gainRef.current || !audioCtxRef.current) return;
-
-    // desconectar cualquier conexión previa
     try { sourceRef.current.disconnect(); } catch {}
     try { compRef.current?.disconnect(); } catch {}
     try { gainRef.current.disconnect(); } catch {}
 
-    if (useCompressor && compRef.current) {
+    if (useComp && compRef.current) {
       sourceRef.current.connect(compRef.current);
       compRef.current.connect(gainRef.current);
       gainRef.current.connect(audioCtxRef.current.destination);
     } else {
-      // bypass del compresor
       sourceRef.current.connect(gainRef.current);
       gainRef.current.connect(audioCtxRef.current.destination);
     }
   };
 
-  const playTrack = (track) => {
+  const playTrackFromStart = (track) => {
     const a = audioRef.current;
     if (!a) return;
     ensureAudioGraph();
@@ -96,58 +91,68 @@ export default function AudioTrainer() {
     }).catch(() => setIsPlaying(false));
   };
 
-  const pauseTrack = () => {
+  const resume = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    ensureAudioGraph();
+    a.play().then(() => setIsPlaying(true));
+  };
+
+  const pause = () => {
     const a = audioRef.current;
     if (!a) return;
     a.pause();
     setIsPlaying(false);
   };
 
-  const restartTrack = () => {
+  const restart = (track) => {
     const a = audioRef.current;
     if (!a) return;
     ensureAudioGraph();
+    // si cambia de pista con doble clic, cámbiala y reinicia
+    if (!currentId || currentId !== track.id) {
+      a.src = track.src;
+      setCurrentId(track.id);
+    }
     a.currentTime = 0;
     a.play().then(() => setIsPlaying(true));
   };
 
-  const handleButtonClick = (track) => {
-    const now = Date.now();
-    const same = clickState.current.lastId === track.id;
-    const within = now - clickState.current.lastTime <= CLICK_WINDOW_MS;
-
-    if (same && within) {
-      clickState.current.count += 1;
-    } else {
-      clickState.current.count = 1;
-      clickState.current.lastId = track.id;
-    }
-    clickState.current.lastTime = now;
-
-    const count = clickState.current.count;
-
-    if (count >= 3) { // triple: reinicia
-      restartTrack();
-      clickState.current.count = 0;
-      return;
-    }
-    if (count === 2) { // doble: pausa
-      pauseTrack();
-      return;
-    }
-    // simple: reproduce (o reanuda)
+  // SINGLE CLICK: play otra pista / toggle play-pause misma pista
+  const handleSingleClick = (track) => {
     if (currentId !== track.id) {
-      playTrack(track);
-    } else if (!isPlaying) {
-      ensureAudioGraph();
-      audioRef.current.play().then(() => setIsPlaying(true));
+      playTrackFromStart(track); // otra pista → reproducir
+    } else {
+      // misma pista: toggle play/pause
+      if (isPlaying) pause();
+      else resume();
     }
+  };
+
+  // DOUBLE CLICK: reinicia
+  const handleDoubleClick = (track) => {
+    restart(track);
+  };
+
+  const handleTileClick = (track) => {
+    // Si hay timer pendiente, es el 2º click → doble clic
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      handleDoubleClick(track);
+      return;
+    }
+    // Primer clic: espera por si hay segundo clic
+    clickTimerRef.current = setTimeout(() => {
+      handleSingleClick(track);
+      clickTimerRef.current = null;
+    }, CLICK_DELAY);
   };
 
   return (
     <div className="page">
       <h2>Audio Trainer</h2>
-      <p className="subtitle">1 clic: reproducir · 2 clics: pausa · 3 clics: reiniciar</p>
+      <p className="subtitle">1 clic: play/pausa · 2 clics: reiniciar</p>
 
       <div className="grid">
         {TRACKS.map((t) => {
@@ -155,11 +160,9 @@ export default function AudioTrainer() {
           return (
             <button
               key={t.id}
-              onClick={() => handleButtonClick(t)}
+              onClick={() => handleTileClick(t)}
               title={t.title}
               className={`tile ${active ? "active" : ""}`}
-              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 14, lineHeight: 1.2 }}>{t.title}</div>
